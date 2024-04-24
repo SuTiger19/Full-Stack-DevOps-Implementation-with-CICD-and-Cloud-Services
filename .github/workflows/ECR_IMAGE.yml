@@ -1,0 +1,72 @@
+name: Deploy to ECR
+on:
+  workflow_dispatch:
+    inputs:
+      approver:
+        description: "ECR Deployment Approver"
+        required: true
+        default: "SuTiger19"
+
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    outputs:
+      is_approved: ${{ steps.check_approval.outputs.approved }}
+    steps:
+      - name: Check Approver
+        id: check_approval
+        run: |
+          APPROVER="${{ github.event.inputs.approver }}"
+          if [ "$APPROVER" == "SuTiger19" ]; then
+            echo "Deployment approved by $APPROVER"
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            echo "Deployment not approved by $APPROVER"
+            echo "approved=false" >> $GITHUB_OUTPUT
+          fi
+  terraform_ecr:
+    name: Terraform ECR
+    needs: confirm
+    if: needs.confirm.outputs.is_approved == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Login to Amazon ECR
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: us-east-1
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: BUILD->TEST->PUSH
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          AWS_REGION: us-east-1
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: project
+          IMAGE_TAG: v0.1
+          DATABASE_ECR_PREFIX: database
+          APPLICATION_ECR_PREFIX: app
+          PASSWORD: password123
+        run: |
+          cd web_application/
+          docker build -t $ECR_REGISTRY/${DATABASE_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile_mysql .
+          docker build -t $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .
+          docker run -d -e MYSQL_ROOT_PASSWORD=$PASSWORD --name mysql $ECR_REGISTRY/${DATABASE_ECR_PREFIX}-${ECR_REPOSITORY}:${IMAGE_TAG} 
+          docker ps
+          sleep 10
+
+          docker run -d -p 81:81 -e DBHOST="172.17.0.2" -e DBPWD=$PASSWORD $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-${ECR_REPOSITORY}:${IMAGE_TAG}
+          docker ps
+          sleep 10
+          curl localhost:81 -vvv 
+
+          docker push $ECR_REGISTRY/${DATABASE_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG
