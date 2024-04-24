@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: application
+  labels:
+    app: employees
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: employees
+  template:
+    metadata:
+      labels:
+        app: employees
+    spec:
+      containers:
+        - name: application-container
+          image: 494992235231.dkr.ecr.us-east-1.amazonaws.com/app-final-project:v0.1
+          imagePullPolicy: Always
+          env:
+          - name: DBHOST
+            valueFrom: 
+              configMapKeyRef:
+                name: appconfigmap
+                key: DBHOST
+          - name: DBUSER
+            valueFrom: 
+              secretKeyRef:
+                name: dbsecrets
+                key: DBUSER
+          - name: DBPWD
+            valueFrom: 
+              secretKeyRef:
+                name: dbsecrets
+                key: MYSQL_ROOT_PASSWORD 
+          - name: DATABASE
+            valueFrom: 
+              secretKeyRef:
+                name: dbsecrets
+                key: MYSQL_DATABASE  
+          - name: DBPORT
+            valueFrom: 
+              configMapKeyRef:
+                name: appconfigmap
+                key: DBPORT
+          - name: backgroundimage
+            valueFrom: 
+              configMapKeyRef:
+                name: appconfigmap
+                key: backgroundimage
+          - name: bucketname
+            valueFrom: 
+              configMapKeyRef:
+                name: appconfigmap
+                key: bucketname
+          - name: groupName
+            valueFrom: 
+              configMapKeyRef:
+                name: appconfigmap
+                key: groupName
+          ports:
+            - containerPort: 81
+          resources:
+            requests:
+              cpu: 15m
+            limits:
+              cpu: 50m
