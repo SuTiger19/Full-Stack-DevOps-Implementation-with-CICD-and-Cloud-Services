@@ -63,10 +63,12 @@ jobs:
           docker ps
           sleep 10
 
-          docker run -d -p 81:81 -e DBHOST="172.17.0.2" -e DBPWD=$PASSWORD $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-${ECR_REPOSITORY}:${IMAGE_TAG}
+          docker run -d -p 8080:8080 -e DBHOST="172.17.0.2" -e DBPWD=$PASSWORD $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-${ECR_REPOSITORY}:${IMAGE_TAG}
           docker ps
           sleep 10
-          curl localhost:81 -vvv 
+          curl localhost:8080 -vvv 
 
           docker push $ECR_REGISTRY/${DATABASE_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/${APPLICATION_ECR_PREFIX}-$ECR_REPOSITORY:$IMAGE_TAG
+
+
